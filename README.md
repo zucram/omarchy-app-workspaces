@@ -151,6 +151,10 @@ settings, and Lua-string escaping. QML behavior also needs a running desktop;
 see [validation evidence and limits](docs/validation.md). The initial release
 is a preview, not a claim of broad hardware coverage.
 
+## Support
+
+[Support on Ko-fi](https://ko-fi.com/K3K11RWTSL) to help maintain App Workspaces.
+
 ## License
 
 MIT. Copyright TheTrueFerret and zucram. Application icons belong to their

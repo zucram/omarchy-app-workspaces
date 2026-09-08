@@ -45,6 +45,8 @@ local desktop entries and compositor IPC; no network calls or privileged
 operations. Settings update only this widget's inline bar entry. Installing it
 does not automatically disable another widget or change Hyprland configuration.
 
+The README includes optional Ko-fi support for this fork's maintenance.
+
 Initial preview tested on Omarchy 4.0.2 / Hyprland 0.56.2. Live multi-monitor
 and vertical-bar coverage is pending; see docs/validation.md.
 
