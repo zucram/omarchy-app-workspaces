@@ -46,10 +46,12 @@ Decent Workspaces, disable it after checking the new widget:
 omarchy plugin disable io.github.thetrueferret.decent-workspaces
 ```
 
-For a local checkout, copy this repository's contents to
-`~/.config/omarchy/plugins/io.github.zucram.app-workspaces`, then run:
+For a local checkout, build and extract the runtime archive, then enable it:
 
 ```bash
+node scripts/package-release.cjs
+mkdir -p ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
+tar -xzf app-workspaces-0.1.1.tar.gz -C ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
 omarchy plugin validate ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
 omarchy restart shell
 omarchy plugin enable io.github.zucram.app-workspaces --section left --index 1
@@ -150,6 +152,12 @@ Model tests exercise matching, lifecycle misses, ordering, filters, malformed
 settings, and Lua-string escaping. QML behavior also needs a running desktop;
 see [validation evidence and limits](docs/validation.md). The initial release
 is a preview, not a claim of broad hardware coverage.
+
+Release checks reject agent instruction files at any depth in the source tree.
+`node scripts/package-release.cjs` builds an archive containing only the runtime,
+attribution, preview, and user documentation listed in that script. Tests inspect
+the extracted archive and compare every file with its source. CI runs both model
+and release checks. Keep development instructions outside the published plugin.
 
 ## Support
 

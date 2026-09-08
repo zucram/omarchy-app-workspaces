@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — package correction
+
+- Remove agent instruction files from the published source and runtime package.
+- Build release archives from an explicit runtime and documentation allowlist.
+- Reject agent instruction files at any depth in release tests.
+- Preserve the 0.1.0 widget behavior and settings.
+
 ## 0.1.0 — initial preview
 
 - Fork Decent Workspaces 1.0.0, preserving its MIT attribution.

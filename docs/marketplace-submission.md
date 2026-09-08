@@ -47,6 +47,10 @@ does not automatically disable another widget or change Hyprland configuration.
 
 The README includes optional Ko-fi support for this fork's maintenance.
 
+Version 0.1.1 removes agent instruction files from the published source tree.
+Release tests reject these files at any depth, and release archives use an
+explicit runtime and documentation allowlist. Widget behavior is unchanged.
+
 Initial preview tested on Omarchy 4.0.2 / Hyprland 0.56.2. Live multi-monitor
 and vertical-bar coverage is pending; see docs/validation.md.
 
