@@ -98,3 +98,23 @@ floating bar. No mouse-button binding or input configuration was installed.
 
 The installer was unchanged, so its earlier tests were not repeated. The other
 live coverage limits above still apply.
+
+## Packaging correction, 0.1.1, 2026-09-08
+
+The marketplace reviewer identified root agent instruction files in 0.1.0.
+Version 0.1.1 removes them from the published source tree. The release packager
+uses an explicit list of 12 runtime, attribution, preview, and documentation
+files. The workstation installer uses that same packager.
+
+- The release regression failed against the previous tree, identifying AGENTS.md.
+- All 19 Node tests passed, including nested instruction-path rejection and
+  inspection of the archive's exact file list and extracted contents.
+- Both isolated workstation installer tests passed.
+- Live deployment contained exactly the 12 allowed files, with no agent
+  instruction files, development scripts, tests, or nested release archives.
+- Native plugin validation and shell readiness passed. IPC reported 0.1.1,
+  the saved options were retained, and the native settings panel opened.
+- The live shell log contained no plugin QML warnings or errors.
+
+The only runtime-source change is the reported version. The earlier UI and
+model evidence still applies; hardware and browser coverage was not expanded.
