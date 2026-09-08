@@ -4,6 +4,10 @@ Status: prepared locally. The public repository has not been created and no
 marketplace issue has been sent. The planned repository is
 `https://github.com/zucram/omarchy-app-workspaces`.
 
+The initial local `v0.1.0` tag and archive predate the settings follow-up in
+`docs/validation.md`. Prepare the final release tag and archive from reviewed
+main before publication. The public submission still requires owner approval.
+
 Review the preview, README, license, and validation limits before publication.
 The owner must confirm the five checklist statements in the
 [official submission guide](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SUBMISSION.md).

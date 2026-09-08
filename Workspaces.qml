@@ -140,6 +140,15 @@ BarWidget {
   function open() { root.popupAnchor = strip; root.opened = true }
   function close() { root.opened = false }
   function toggle() { root.opened ? root.close() : root.open() }
+  // The bar and open KeyboardPanels forward clicks to registered WidgetButtons.
+  // Register app buttons after their enclosing pill so the narrower hit wins.
+  function syncClickTargets() {
+    for (var i = 0; i < workspaceRepeater.count; i++) {
+      var pill = workspaceRepeater.itemAt(i)
+      if (pill) pill.syncClickTargets()
+    }
+  }
+  onBarChanged: Qt.callLater(root.syncClickTargets)
   function setOption(key, value) {
     var normal = Model.normalizeSettings(({}))
     if (!Object.prototype.hasOwnProperty.call(normal, key)) return false
@@ -160,7 +169,7 @@ BarWidget {
     if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, next)
   }
   function status() {
-    return JSON.stringify({version: "0.1.0", activeScratchpads: root.activeSpecialIds, options: root.options, screen: root.screenName, activeWorkspace: root.activeId,
+    return JSON.stringify({version: "0.1.0", settingsOpen: root.opened, activeScratchpads: root.activeSpecialIds, options: root.options, screen: root.screenName, activeWorkspace: root.activeId,
       workspaces: root.visibleWorkspaces.map(function(ws) { return {id: ws.id, name: ws.name, windows: root.presentWindows(ws.id)} })})
   }
   IpcHandler {
@@ -189,7 +198,9 @@ BarWidget {
     columnSpacing: 6
     rowSpacing: 6
     Repeater {
+      id: workspaceRepeater
       model: root.visibleWorkspaces
+      onItemAdded: Qt.callLater(root.syncClickTargets)
       Rectangle {
         id: pill
         required property var modelData
@@ -198,29 +209,38 @@ BarWidget {
         readonly property var apps: root.presentWindows(pill.modelData.id)
         readonly property var shownApps: !root.options.showIcons ? [] : root.options.maxIcons > 0 ? pill.apps.slice(0, root.options.maxIcons) : pill.apps
         readonly property int overflow: root.options.showIcons ? pill.apps.length - pill.shownApps.length : 0
+        function syncClickTargets() {
+          workspaceMouse.syncClickRegistration()
+          for (var i = 0; i < appRepeater.count; i++) {
+            var app = appRepeater.itemAt(i)
+            if (app) app.clickTarget.syncClickRegistration()
+          }
+        }
         implicitWidth: root.vertical ? root.barSize - 4 : content.implicitWidth + 18
         implicitHeight: root.vertical ? content.implicitHeight + 12 : root.barSize - 6
         radius: Math.min(9, height / 2)
         color: pill.modelData.urgent ? Util.alpha(Color.urgent, 0.23)
           : pill.active ? Util.alpha(root.foreground, 0.15)
-          : workspaceMouse.containsMouse ? Util.alpha(root.foreground, 0.07) : "transparent"
+          : workspaceMouse.tooltipHovered ? Util.alpha(root.foreground, 0.07) : "transparent"
         border.width: pill.active ? 1 : 0
         border.color: Util.alpha(root.foreground, 0.13)
-        MouseArea {
+        WidgetButton {
           id: workspaceMouse
           anchors.fill: parent
-          hoverEnabled: true
-          acceptedButtons: Qt.LeftButton | Qt.RightButton
-          cursorShape: Qt.PointingHandCursor
-          onClicked: function(mouse) {
-            if (mouse.button === Qt.RightButton) { root.popupAnchor = pill; root.opened = true }
-            else if (pill.special) root.toggleScratchpad(pill.modelData.name)
-            else root.focusWorkspace(pill.modelData.id)
+          bar: root.bar
+          labelVisible: false
+          hasVisualContent: true
+          onPressed: function(button) {
+            if (button === Qt.RightButton) { root.popupAnchor = pill; root.opened = true }
+            else if (button === Qt.LeftButton) {
+              if (pill.special) root.toggleScratchpad(pill.modelData.name)
+              else root.focusWorkspace(pill.modelData.id)
+            }
           }
-          onWheel: function(wheel) { root.scroll(wheel.angleDelta.y) }
+          onWheelMoved: function(delta) { root.scroll(delta) }
         }
         PanelToolTip {
-          visible: workspaceMouse.containsMouse && !root.opened
+          visible: workspaceMouse.tooltipHovered && !root.opened
           text: pill.special ? "Scratchpad: " + pill.modelData.name.replace(/^special:?/, "") : "Workspace " + pill.modelData.id
         }
         GridLayout {
@@ -243,10 +263,13 @@ BarWidget {
             Layout.rightMargin: root.vertical || pill.shownApps.length === 0 ? 0 : 2
           }
           Repeater {
+            id: appRepeater
             model: pill.shownApps
+            onItemAdded: Qt.callLater(root.syncClickTargets)
             Item {
               id: app
               required property var modelData
+              property alias clickTarget: appMouse
               implicitWidth: root.options.iconSize
               implicitHeight: root.options.iconSize
               Layout.alignment: Qt.AlignCenter
@@ -287,20 +310,20 @@ BarWidget {
                 border.width: 1
                 border.color: root.foreground
               }
-              MouseArea {
+              WidgetButton {
                 id: appMouse
                 anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                cursorShape: Qt.PointingHandCursor
-                onClicked: function(mouse) {
-                  if (mouse.button === Qt.RightButton) { root.popupAnchor = pill; root.opened = true }
-                  else root.focusWindow(app.modelData.address, pill.modelData.id)
+                bar: root.bar
+                labelVisible: false
+                hasVisualContent: true
+                onPressed: function(button) {
+                  if (button === Qt.RightButton) { root.popupAnchor = pill; root.opened = true }
+                  else if (button === Qt.LeftButton) root.focusWindow(app.modelData.address, pill.modelData.id)
                 }
-                onWheel: function(wheel) { root.scroll(wheel.angleDelta.y) }
+                onWheelMoved: function(delta) { root.scroll(delta) }
               }
               PanelToolTip {
-                visible: appMouse.containsMouse && !root.opened
+                visible: appMouse.tooltipHovered && !root.opened
                 text: app.modelData.name + (app.modelData.floating ? " · Floating" : "") + (app.modelData.pinned ? " · Pinned" : "") + (app.modelData.title && app.modelData.title !== app.modelData.name ? "\n" + app.modelData.title.substring(0, 180) : "")
               }
             }

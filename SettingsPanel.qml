@@ -122,8 +122,9 @@ KeyboardPanel {
         }
         Toggle {
           width: parent.width
-          visible: panel.page === "windows"
+          visible: panel.page === "appearance"
           label: "Show empty workspaces"
+          description: "Keep workspaces 1–10 available when unused."
           titleSize: 13
           checked: panel.widget.options.showEmpty
           onClicked: panel.widget.setOption("showEmpty", !checked)

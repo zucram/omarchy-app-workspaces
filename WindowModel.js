@@ -122,14 +122,23 @@ function normalizeSettings(raw) {
 }
 
 // Rows contain numeric id, monitor name and numeric windows count. Active ID
-// is the workspace active on this bar's monitor. Empty rows come from live
-// state; this function never synthesizes workspace numbers or caps them at 10.
+// is the workspace active on this bar's monitor. When requested, offer Omarchy's
+// standard 1–10 destinations even before Hyprland creates them. Keep live IDs
+// above 10, and never duplicate a workspace owned by another monitor.
 function visibleWorkspaces(workspaces, monitorName, activeId, settings) {
     settings = normalizeSettings(settings);
-    return (Array.isArray(workspaces) ? workspaces : []).filter(function (w) {
+    var rows = (Array.isArray(workspaces) ? workspaces : []).filter(function (w) {
         return w && typeof w.id === "number" && isFinite(w.id) && w.id > 0
-            && Math.floor(w.id) === w.id
-            && (!settings.perMonitor || w.monitor === monitorName)
+            && Math.floor(w.id) === w.id;
+    });
+    if (settings.showEmpty) {
+        for (var id = 1; id <= 10; id++) {
+            if (!rows.some(function(w) { return w.id === id; }))
+                rows.push({id: id, name: String(id), monitor: monitorName, windows: 0, placeholder: true});
+        }
+    }
+    return rows.filter(function(w) {
+        return (!settings.perMonitor || w.monitor === monitorName)
             && (settings.showEmpty || w.id === activeId || w.windows > 0);
     }).sort(function (a, b) { return a.id - b.id; });
 }

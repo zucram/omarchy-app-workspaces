@@ -114,9 +114,32 @@ test('workspaces filter by monitor, occupancy and active ID without an ID ceilin
     ];
     const ids = settings => plain(model.visibleWorkspaces(rows, 'A', 3, settings)).map(w => w.id);
     assert.deepEqual(ids({}), [3, 21]);
-    assert.deepEqual(ids({ showEmpty: true }), [1, 3, 21]);
+    assert.deepEqual(ids({ showEmpty: true }), [1, 3, 4, 5, 6, 7, 8, 9, 10, 21]);
     assert.deepEqual(ids({ perMonitor: false }), [2, 3, 21]);
     assert.equal(rows[0].id, 21);
+});
+
+test('show empty offers the ten standard destinations before Hyprland creates them', () => {
+    const rows = [{ id: 1, name: '1', monitor: 'A', windows: 2 }];
+    const shown = plain(model.visibleWorkspaces(rows, 'A', 1, { showEmpty: true }));
+    assert.deepEqual(shown.map(w => w.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    assert.equal(shown[0].windows, 2);
+    assert.ok(shown.slice(1).every(w => w.windows === 0 && w.monitor === 'A'));
+    assert.deepEqual(plain(model.visibleWorkspaces(rows, 'A', 1, {})).map(w => w.id), [1]);
+    assert.equal(rows.length, 1);
+    assert.equal(model.visibleWorkspaces([], 'A', 1, { showEmpty: true }).length, 10);
+});
+
+test('empty destinations do not duplicate live workspaces assigned to another monitor', () => {
+    const rows = [{ id: 2, name: '2', monitor: 'B', windows: 0 },
+        { id: 15, name: '15', monitor: 'A', windows: 1 }];
+    const local = plain(model.visibleWorkspaces(rows, 'A', 15, { showEmpty: true }));
+    assert.ok(!local.some(w => w.id === 2));
+    assert.equal(local.at(-1).id, 15);
+    const all = plain(model.visibleWorkspaces(rows, 'A', 15,
+        { showEmpty: true, perMonitor: false }));
+    assert.equal(all.filter(w => w.id === 2).length, 1);
+    assert.equal(all.find(w => w.id === 2).monitor, 'B');
 });
 
 test('scratchpads stay reachable across monitors and can be hidden', () => {

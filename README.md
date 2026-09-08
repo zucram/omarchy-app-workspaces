@@ -80,7 +80,7 @@ toggles. Escape closes the panel. Reset defaults resets both pages.
 | Icon spacing | 6 px | 2–12 px. |
 | Icons per workspace | All | Limit the visible count and show `+N` for the rest. |
 | Group windows from the same app | Off | Show the leftmost window for each class; clicking focuses that representative. |
-| Show empty workspaces | Off | Include empty workspaces reported by Hyprland; never invent numbers 1–10. |
+| Show empty workspaces | Off | In Appearance. Include unused destinations 1–10 and other empty workspaces reported by Hyprland. |
 | Only this monitor | On | Filter numbered workspaces to the bar's monitor. |
 | Show scratchpads | On | Separate pills for special workspaces. |
 | Keep empty scratchpads visible | Off | Retain the default scratchpad and named scratchpads encountered during this shell session. |
@@ -123,7 +123,8 @@ omarchy-shell io.github.zucram.app-workspaces refresh
 omarchy-shell io.github.zucram.app-workspaces open
 ```
 
-`status` reports local window titles, icon sources, ordering, and settings.
+`status` reports local window titles, icon sources, ordering, settings, and
+whether the settings panel is open (`settingsOpen`).
 Review titles before sharing its output. Nothing is transmitted by the plugin.
 Window events trigger a refresh; a one-second compositor refresh also catches
 geometry changes that have no event. Unchanged snapshots keep their delegates.
