@@ -1,19 +1,15 @@
-# Marketplace submission draft
+# Marketplace submission
 
-Status: prepared locally. The public repository has not been created and no
-marketplace issue has been sent. The planned repository is
-`https://github.com/zucram/omarchy-app-workspaces`.
+The owner approved the public 0.1.0 preview release and this submission on
+2026-09-08. The release includes the settings follow-up in `docs/validation.md`.
 
-The initial local `v0.1.0` tag and archive predate the settings follow-up in
-`docs/validation.md`. Prepare the final release tag and archive from reviewed
-main before publication. The public submission still requires owner approval.
+Repository: `https://github.com/zucram/omarchy-app-workspaces`.
 
-Review the preview, README, license, and validation limits before publication.
-The owner must confirm the five checklist statements in the
+The text below follows the
 [official submission guide](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SUBMISSION.md).
-After the repository is public and the statements are confirmed, check all
-five boxes in the issue body below. Marketplace maintainers decide listing
-approval; creating the issue does not publish the listing.
+Marketplace automation posts validation and baseline results on the submission
+issue. Marketplace maintainers decide listing approval; creating the issue
+does not publish the listing.
 
 Title: `[Plugin]: App Workspaces`
 
@@ -54,8 +50,8 @@ and vertical-bar coverage is pending; see docs/validation.md.
 
 ### Submission checklist
 
-- [ ] The repository is public and contains installation and removal instructions.
-- [ ] I have documented the plugin license and any external dependencies.
-- [ ] I confirm that I own or have permission to submit this plugin and its preview assets.
-- [ ] The plugin does not overwrite user configuration without explicit consent.
-- [ ] I understand that approval is for listing and is not a security review.
+- [x] The repository is public and contains installation and removal instructions.
+- [x] I have documented the plugin license and any external dependencies.
+- [x] I confirm that I own or have permission to submit this plugin and its preview assets.
+- [x] The plugin does not overwrite user configuration without explicit consent.
+- [x] I understand that approval is for listing and is not a security review.

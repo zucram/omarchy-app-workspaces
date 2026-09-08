@@ -34,9 +34,6 @@ Node.js is only needed for development tests.
 
 ## Install
 
-The GitHub URL below is reserved for the planned public repository. Until it
-is published, use the local checkout method.
-
 ```bash
 omarchy plugin add https://github.com/zucram/omarchy-app-workspaces.git --enable
 omarchy bar put io.github.zucram.app-workspaces --section left --index 1

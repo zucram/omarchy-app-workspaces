@@ -13,7 +13,8 @@ Quickshell shell, a horizontal floating bar, and the scrolling layout.
 - The marketplace's local manifest and preview validators passed. The chosen ID
   was absent from its current and retired listings. Its baseline analysis of
   local text files returned `passed`, with no findings or capabilities. This
-  was a local preflight; the official GitHub snapshot review is still pending.
+  was a local preflight. The marketplace submission issue records the official
+  GitHub snapshot review separately.
 - `qmllint` exited zero with native Omarchy imports. It reported warnings for
   dynamic host properties and access to outer IDs; this is not a warning-free
   lint result.
