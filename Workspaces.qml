@@ -1,266 +1,322 @@
+// Forked from Decent Workspaces by TheTrueFerret, MIT. See NOTICE.md.
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import Quickshell.Hyprland
 import qs.Commons
 import qs.Ui
-import "IconRules.js" as IconRules
+import "WindowModel.js" as Model
 
-// Workspace indicators that show only what is actually there: workspaces with
-// windows on them, filtered to the monitor this bar instance lives on, each
-// labelled with its number plus an icon per open window.
 BarWidget {
   id: root
-  moduleName: "io.github.thetrueferret.decent-workspaces"
+  moduleName: "io.github.zucram.app-workspaces"
+  readonly property var options: Model.normalizeSettings(root.settings)
+  readonly property color foreground: root.bar ? root.bar.barForeground : Color.foreground
+  readonly property var barWindow: root.QsWindow.window
+  readonly property string screenName: barWindow && barWindow.screen ? barWindow.screen.name : ""
+  property var windows: []
+  property var workspaces: []
+  property string modelSignature: ""
+  property bool opened: false
+  property string saveError: ""
+  property var popupAnchor: strip
 
-  // --- settings, read from this widget's shell.json layout entry ------------
-  readonly property bool perMonitor: root.setting("perMonitor", true)
-  readonly property bool showEmpty: root.setting("showEmpty", false)
-  readonly property bool showIcons: root.setting("showIcons", true)
-  // 0 = show an icon for every window; otherwise overflow collapses to "+N".
-  readonly property int maxIcons: root.setting("maxIcons", 0)
-  readonly property int maxWorkspaceId: root.setting("maxWorkspaceId", 10)
-
-  readonly property color fgColor: root.bar ? root.bar.barForeground : Color.foreground
-  readonly property color bgColor: root.bar ? root.bar.background : Color.background
-  readonly property color urgentColor: Color.urgent
-  readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(15)
-
-  // --- which monitor is this bar on ----------------------------------------
-  // One bar surface exists per monitor, so the widget reads its own screen off
-  // the window it was instantiated into rather than off any global focus state.
-  readonly property var barWindow: root.QsWindow ? root.QsWindow.window : null
-  readonly property string screenName: barWindow && barWindow.screen ? String(barWindow.screen.name || "") : ""
-
-  readonly property var hyprMonitor: {
-    var _ = root.revision
-    if (root.screenName === "") return null
+  readonly property int activeId: {
     var monitors = Hyprland.monitors.values
     for (var i = 0; i < monitors.length; i++) {
-      if (String(monitors[i].name) === root.screenName) return monitors[i]
+      if (monitors[i].name === root.screenName && monitors[i].activeWorkspace)
+        return monitors[i].activeWorkspace.id
     }
-    return null
-  }
-
-  // The workspace active *on this monitor*, which is not the same as the
-  // globally focused workspace once a second monitor exists.
-  readonly property int activeId: {
-    if (root.hyprMonitor && root.hyprMonitor.activeWorkspace) return root.hyprMonitor.activeWorkspace.id
     return Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : -1
   }
+  property var activeSpecialIds: []
+  property var knownScratchpads: ["special:scratchpad"]
+  readonly property var visibleWorkspaces: Model.visibleWorkspaces(root.workspaces, root.screenName, root.activeId, root.options)
+    .concat(Model.scratchpads(root.workspaces, root.activeSpecialIds, root.options, root.knownScratchpads))
 
-  // Whether this monitor is the one holding keyboard focus, used to keep the
-  // active pill on the other monitors visibly quieter.
-  readonly property bool monitorFocused: {
-    var _ = root.revision
-    if (root.screenName === "" || !Hyprland.focusedMonitor) return true
-    return String(Hyprland.focusedMonitor.name) === root.screenName
+  function refresh() {
+    Hyprland.refreshMonitors()
+    Hyprland.refreshWorkspaces()
+    Hyprland.refreshToplevels()
+    settle.restart()
   }
-
-  // --- keeping Hyprland's view fresh ---------------------------------------
-  // Quickshell does not refetch toplevels or workspaces on its own, so window
-  // and workspace events have to poke it or occupancy goes stale. `revision`
-  // is bumped alongside so bindings below re-evaluate on events that change
-  // nothing Quickshell exposes as a property (focusedmon, urgent).
-  property int revision: 0
-
-  readonly property var windowEvents: ["openwindow", "closewindow", "movewindow", "movewindowv2", "windowtitle", "windowtitlev2", "activewindow", "activewindowv2", "urgent"]
-  readonly property var workspaceEvents: ["workspace", "workspacev2", "createworkspace", "createworkspacev2", "destroyworkspace", "destroyworkspacev2", "moveworkspace", "moveworkspacev2", "focusedmon"]
-
+  function readModel() {
+    var tops = Hyprland.toplevels.values
+    var nextWindows = []
+    for (var i = 0; i < tops.length; i++) {
+      var t = tops[i]
+      var ipc = t.lastIpcObject || ({})
+      var address = String(t.address || ipc.address || "")
+      if (!address) continue
+      nextWindows.push({address: address,
+        class: String(ipc["class"] || ipc.initialClass || ""),
+        title: String(t.title || ipc.title || ""),
+        at: ipc.at || [0, 0], floating: ipc.floating === true, pinned: ipc.pinned === true,
+        workspaceId: t.workspace ? t.workspace.id : (ipc.workspace ? ipc.workspace.id : 0)})
+    }
+    var nextWorkspaces = []
+    var ws = Hyprland.workspaces.values
+    for (var j = 0; j < ws.length; j++) {
+      var id = ws[j].id
+      nextWorkspaces.push({id: id, name: String(ws[j].name || ""), monitor: ws[j].monitor ? ws[j].monitor.name : "",
+        windows: nextWindows.filter(function(w) { return w.workspaceId === id }).length,
+        urgent: ws[j].urgent === true})
+    }
+    var known = root.knownScratchpads.slice()
+    nextWorkspaces.forEach(function(w) {
+      if (w.id < 0 && known.indexOf(w.name) === -1) known.push(w.name)
+    })
+    if (known.length !== root.knownScratchpads.length) root.knownScratchpads = known
+    var activeSpecial = []
+    var monitors = Hyprland.monitors.values
+    for (var m = 0; m < monitors.length; m++) {
+      var special = (monitors[m].lastIpcObject || {}).specialWorkspace
+      if (special && special.id < 0) activeSpecial.push(special.id)
+    }
+    if (JSON.stringify(activeSpecial) !== JSON.stringify(root.activeSpecialIds)) root.activeSpecialIds = activeSpecial
+    var signature = JSON.stringify([nextWindows, nextWorkspaces])
+    if (signature !== root.modelSignature) {
+      root.modelSignature = signature
+      root.windows = nextWindows
+      root.workspaces = nextWorkspaces
+    }
+  }
+  Component.onCompleted: root.refresh()
   Connections {
     target: Hyprland
     function onRawEvent(event) {
-      var name = event.name
-      if (root.windowEvents.indexOf(name) !== -1) {
-        Hyprland.refreshToplevels()
-        root.revision++
-      } else if (root.workspaceEvents.indexOf(name) !== -1) {
-        Hyprland.refreshWorkspaces()
-        root.revision++
-      }
+      var name = String(event.name)
+      if (/window|workspace|focusedmon|monitoradded|monitorremoved|configreloaded|urgent/.test(name))
+        refreshDelay.restart()
+    }
+  }
+  Timer { id: refreshDelay; interval: 60; onTriggered: root.refresh() }
+  Timer { id: settle; interval: 80; onTriggered: root.readModel() }
+  // Geometry changes do not all have IPC events. Refresh without starting a
+  // shell process; unchanged snapshots do not rebuild the window delegates.
+  Timer { interval: 1000; repeat: true; running: root.visible; onTriggered: root.refresh() }
+
+  function iconSource(icon) {
+    var value = String(icon || "")
+    if (!value) return ""
+    if (value.indexOf("file://") === 0 || value.indexOf("image://icon/") === 0) return value
+    if (value.charAt(0) === "/") return "file://" + value
+    return Quickshell.iconPath(value, true)
+  }
+  function presentWindows(workspaceId) {
+    var items = Model.windowsForWorkspace(root.windows, workspaceId, root.options)
+    var entries = Array.prototype.slice.call(DesktopEntries.applications.values)
+    return items.map(function(w) {
+      var hint = w.class ? DesktopEntries.heuristicLookup(w.class) : null
+      var entry = Model.resolveEntry(w.class, w.title, entries, hint, root.settings.iconOverrides || ({}))
+      var name = entry ? entry.name : (w.class || w.title || "Window")
+      return {address: w.address, class: w.class, title: w.title, name: name,
+        floating: w.floating, pinned: w.pinned, source: root.iconSource(entry ? entry.icon : ""), initial: name.substring(0, 1).toUpperCase()}
+    })
+  }
+  function toggleScratchpad(name) {
+    if (!/^special(?::|$)/.test(name)) return
+    Hyprland.dispatch('hl.dsp.workspace.toggle_special(' + Model.luaString(name.replace(/^special:?/, "")) + ')')
+  }
+  function focusWorkspace(id) {
+    if (id < 0) {
+      var ws = root.workspaces.filter(function(w) { return w.id === id })[0]
+      if (ws) root.toggleScratchpad(ws.name)
+      return
+    }
+    if (typeof id !== "number" || id <= 0) return
+    Hyprland.dispatch('hl.dsp.focus({ workspace = "' + id + '" })')
+  }
+  function focusWindow(address, workspaceId) {
+    var clean = String(address).replace(/^0x/, "")
+    if (!/^[0-9a-fA-F]+$/.test(clean)) return
+    if (workspaceId < 0 && root.activeSpecialIds.indexOf(workspaceId) === -1) root.focusWorkspace(workspaceId)
+    Hyprland.dispatch('hl.dsp.focus({ window = "address:0x' + clean + '" })')
+  }
+  function scroll(delta) {
+    Hyprland.dispatch('hl.dsp.focus({ workspace = "' + (delta > 0 ? "e+1" : "e-1") + '" })')
+  }
+  function open() { root.popupAnchor = strip; root.opened = true }
+  function close() { root.opened = false }
+  function toggle() { root.opened ? root.close() : root.open() }
+  function setOption(key, value) {
+    var normal = Model.normalizeSettings(({}))
+    if (!Object.prototype.hasOwnProperty.call(normal, key)) return false
+    var next = Object.assign({}, root.settings)
+    next[key] = value
+    next[key] = Model.normalizeSettings(next)[key]
+    var host = root.bar ? root.bar.shell : null
+    if (!host || typeof host.updateEntryInline !== "function") {
+      root.saveError = "Settings could not be saved. Reopen the panel and try again."
+      return false
+    }
+    host.updateEntryInline(root.moduleName, next)
+    root.saveError = ""
+    return true
+  }
+  function resetOptions() {
+    var next = Object.assign({}, root.settings, Model.normalizeSettings(({})))
+    if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, next)
+  }
+  function status() {
+    return JSON.stringify({version: "0.1.0", activeScratchpads: root.activeSpecialIds, options: root.options, screen: root.screenName, activeWorkspace: root.activeId,
+      workspaces: root.visibleWorkspaces.map(function(ws) { return {id: ws.id, name: ws.name, windows: root.presentWindows(ws.id)} })})
+  }
+  IpcHandler {
+    target: root.moduleName
+    function open(): void { root.open() }
+    function close(): void { root.close() }
+    function refresh(): void { root.refresh() }
+    function activateWorkspace(id: int): void { root.focusWorkspace(id) }
+    function activateWindow(address: string): void {
+      var clean = String(address).replace(/^0x/, "")
+      var found = root.windows.filter(function(w) { return w.address.replace(/^0x/, "") === clean })[0]
+      if (found) root.focusWindow(found.address, found.workspaceId)
+    }
+    function status(): string { return root.status() }
+    function setOption(key: string, jsonValue: string): bool {
+      try { return root.setOption(key, JSON.parse(jsonValue)) } catch (e) { return false }
     }
   }
 
-  // --- model ---------------------------------------------------------------
-  function hasWindows(workspace) {
-    if (!workspace) return false
-    var tops = workspace.toplevels ? workspace.toplevels.values : null
-    return !!tops && tops.length > 0
-  }
-
-  // Hyprland reports the owning monitor as an object on the workspace and as a
-  // bare name string in the raw IPC payload; either will do.
-  function monitorNameOf(workspace) {
-    if (!workspace) return ""
-    if (workspace.monitor && workspace.monitor.name) return String(workspace.monitor.name)
-    var ipc = workspace.lastIpcObject
-    if (ipc && ipc.monitor) return String(ipc.monitor)
-    return ""
-  }
-
-  readonly property var visibleWorkspaces: {
-    var _ = root.revision
-    var mine = root.screenName
-    var active = root.activeId
-    var result = []
-    var values = Hyprland.workspaces.values
-
-    for (var i = 0; i < values.length; i++) {
-      var workspace = values[i]
-      var id = workspace.id
-      if (id <= 0 || id > root.maxWorkspaceId) continue
-
-      if (root.perMonitor && mine !== "") {
-        var owner = root.monitorNameOf(workspace)
-        // An unknown owner is kept rather than dropped: better a stray pill
-        // than a workspace that silently vanishes from every bar.
-        if (owner !== "" && owner !== mine) continue
-      }
-
-      // The active workspace stays pinned even when empty, otherwise stepping
-      // onto a fresh workspace leaves the bar with nothing to point at.
-      if (!root.showEmpty && !root.hasWindows(workspace) && id !== active) continue
-
-      result.push(workspace)
-    }
-
-    result.sort(function(left, right) { return left.id - right.id })
-    return result
-  }
-
-  // --- icons ---------------------------------------------------------------
-  function windowClass(toplevel) {
-    var ipc = toplevel ? toplevel.lastIpcObject : null
-    if (ipc && ipc.class) return ipc.class
-    if (toplevel && toplevel.class) return toplevel.class
-    if (toplevel && toplevel.appId) return toplevel.appId
-    return ""
-  }
-
-  function windowTitle(toplevel) {
-    if (toplevel && toplevel.title) return toplevel.title
-    var ipc = toplevel ? toplevel.lastIpcObject : null
-    if (ipc && ipc.title) return ipc.title
-    return ""
-  }
-
-  function iconFor(toplevel) {
-    var cls = root.windowClass(toplevel).toLowerCase()
-    var title = root.windowTitle(toplevel).toLowerCase()
-    if (!cls && !title) return IconRules.fallback
-    return IconRules.resolve(cls, title)
-  }
-
-  function iconsFor(workspace) {
-    if (!root.showIcons || !workspace) return ""
-    var tops = workspace.toplevels ? workspace.toplevels.values : null
-    if (!tops || tops.length === 0) return ""
-
-    var shown = root.maxIcons > 0 ? Math.min(tops.length, root.maxIcons) : tops.length
-    var icons = []
-    for (var i = 0; i < shown; i++) icons.push(root.iconFor(tops[i]))
-    if (tops.length > shown) icons.push("+" + (tops.length - shown))
-    return icons.join(" ")
-  }
-
-  function switchWorkspace(delta) {
-    if (!root.bar) return
-    var target = delta > 0 ? "e+" + delta : "e" + delta
-    root.bar.run("hyprctl dispatch " + Util.shellQuote('hl.dsp.focus({ workspace = "' + target + '" })'))
-  }
-
-  // --- layout --------------------------------------------------------------
-  implicitWidth: root.vertical ? root.barSize : strip.implicitWidth + root.trailingGap
-  implicitHeight: strip.implicitHeight
-
-  Item {
+  implicitWidth: root.vertical ? root.barSize : strip.implicitWidth
+  implicitHeight: root.vertical ? strip.implicitHeight : root.barSize
+  GridLayout {
     id: strip
-    anchors.left: parent.left
-    anchors.right: root.vertical ? parent.right : undefined
-    anchors.top: parent.top
-    anchors.bottom: root.vertical ? undefined : parent.bottom
-    anchors.topMargin: root.vertical ? Style.spaceReal(80) : Style.spaceReal(4)
-    anchors.bottomMargin: root.vertical ? 0 : Style.spaceReal(4)
-    implicitWidth: grid.implicitWidth + Style.spaceReal(8)
-    implicitHeight: grid.implicitHeight + Style.spaceReal(8)
-
-    MouseArea {
-      anchors.fill: parent
-      acceptedButtons: Qt.NoButton
-      onWheel: function(wheel) {
-        root.switchWorkspace(wheel.angleDelta.y > 0 ? 1 : -1)
-      }
-    }
-
-    GridLayout {
-      id: grid
-      anchors.left: parent.left
-      anchors.leftMargin: Style.spaceReal(4)
-      anchors.right: parent.right
-      anchors.rightMargin: Style.spaceReal(4)
-      anchors.verticalCenter: parent.verticalCenter
-      columns: root.vertical ? 1 : Math.max(1, root.visibleWorkspaces.length)
-      columnSpacing: root.vertical ? 0 : Style.spaceReal(4)
-      rowSpacing: root.vertical ? Style.spaceReal(4) : 0
-
-      Repeater {
-        model: root.visibleWorkspaces
-
-        Rectangle {
-          id: pill
-          required property var modelData
-
-          readonly property var workspace: pill.modelData
-          readonly property int workspaceId: pill.workspace ? pill.workspace.id : -1
-          readonly property bool active: pill.workspaceId === root.activeId
-          readonly property bool urgent: pill.workspace !== null && pill.workspace.urgent === true
-          property bool hovered: false
-
-          radius: Style.spaceReal(8)
-          color: pill.urgent ? root.urgentColor
-            : pill.active ? Util.alpha(root.fgColor, root.monitorFocused ? 0.22 : 0.10)
-            : pill.hovered ? Util.alpha(root.fgColor, 0.15)
-            : "transparent"
-          opacity: pill.active ? 1 : 0.7
-
-          Layout.alignment: Qt.AlignVCenter
-          Layout.fillHeight: true
-          Layout.fillWidth: root.vertical
-          implicitWidth: root.vertical ? (root.barSize - Style.spaceReal(8)) : content.implicitWidth + Style.spaceReal(16)
-          implicitHeight: root.vertical ? content.implicitHeight + Style.spaceReal(10) : root.barSize - Style.spaceReal(8)
-
-          Row {
-            id: content
-            anchors.centerIn: parent
-            clip: true
-            spacing: Style.spaceReal(3)
-
-            Text {
-              text: String(pill.workspaceId)
-              color: pill.urgent ? root.bgColor : root.fgColor
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: root.vertical ? Style.font.icon : Style.font.body
-            }
-
-            Text {
-              text: root.iconsFor(pill.workspace)
-              visible: text !== ""
-              color: pill.urgent ? root.bgColor : root.fgColor
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: root.vertical ? Style.font.icon : Style.font.body
+    anchors.centerIn: parent
+    columns: root.vertical ? 1 : Math.max(1, root.visibleWorkspaces.length)
+    columnSpacing: 6
+    rowSpacing: 6
+    Repeater {
+      model: root.visibleWorkspaces
+      Rectangle {
+        id: pill
+        required property var modelData
+        readonly property bool special: /^special(?::|$)/.test(pill.modelData.name || "")
+        readonly property bool active: pill.special ? root.activeSpecialIds.indexOf(pill.modelData.id) !== -1 : pill.modelData.id === root.activeId
+        readonly property var apps: root.presentWindows(pill.modelData.id)
+        readonly property var shownApps: !root.options.showIcons ? [] : root.options.maxIcons > 0 ? pill.apps.slice(0, root.options.maxIcons) : pill.apps
+        readonly property int overflow: root.options.showIcons ? pill.apps.length - pill.shownApps.length : 0
+        implicitWidth: root.vertical ? root.barSize - 4 : content.implicitWidth + 18
+        implicitHeight: root.vertical ? content.implicitHeight + 12 : root.barSize - 6
+        radius: Math.min(9, height / 2)
+        color: pill.modelData.urgent ? Util.alpha(Color.urgent, 0.23)
+          : pill.active ? Util.alpha(root.foreground, 0.15)
+          : workspaceMouse.containsMouse ? Util.alpha(root.foreground, 0.07) : "transparent"
+        border.width: pill.active ? 1 : 0
+        border.color: Util.alpha(root.foreground, 0.13)
+        MouseArea {
+          id: workspaceMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          acceptedButtons: Qt.LeftButton | Qt.RightButton
+          cursorShape: Qt.PointingHandCursor
+          onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton) { root.popupAnchor = pill; root.opened = true }
+            else if (pill.special) root.toggleScratchpad(pill.modelData.name)
+            else root.focusWorkspace(pill.modelData.id)
+          }
+          onWheel: function(wheel) { root.scroll(wheel.angleDelta.y) }
+        }
+        PanelToolTip {
+          visible: workspaceMouse.containsMouse && !root.opened
+          text: pill.special ? "Scratchpad: " + pill.modelData.name.replace(/^special:?/, "") : "Workspace " + pill.modelData.id
+        }
+        GridLayout {
+          id: content
+          anchors.centerIn: parent
+          columns: root.vertical ? 1 : 100
+          columnSpacing: root.options.iconGap
+          rowSpacing: root.options.iconGap
+          Text {
+            visible: pill.special || root.options.showNumbers || pill.shownApps.length === 0
+            textFormat: Text.PlainText
+            text: pill.special ? (pill.modelData.name === "special:scratchpad" || pill.modelData.name === "special" ? "S" : pill.modelData.name.replace(/^special:/, "")) : String(pill.modelData.id)
+            elide: Text.ElideRight
+            Layout.maximumWidth: root.vertical ? root.barSize - 10 : 80
+            color: Util.alpha(root.foreground, pill.active ? 1 : 0.65)
+            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.pixelSize: 12
+            font.weight: pill.active ? Font.DemiBold : Font.Normal
+            Layout.alignment: Qt.AlignCenter
+            Layout.rightMargin: root.vertical || pill.shownApps.length === 0 ? 0 : 2
+          }
+          Repeater {
+            model: pill.shownApps
+            Item {
+              id: app
+              required property var modelData
+              implicitWidth: root.options.iconSize
+              implicitHeight: root.options.iconSize
+              Layout.alignment: Qt.AlignCenter
+              Rectangle {
+                anchors.fill: parent
+                radius: 4
+                color: Util.alpha(root.foreground, 0.10)
+                visible: appImage.status !== Image.Ready
+                Text {
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: app.modelData.initial
+                  color: root.foreground
+                  font.family: Style.font.family
+                  font.pixelSize: Math.round(root.options.iconSize * 0.62)
+                  font.bold: true
+                }
+              }
+              Image {
+                id: appImage
+                anchors.fill: parent
+                source: app.modelData.source
+                sourceSize.width: root.options.iconSize * 2
+                sourceSize.height: root.options.iconSize * 2
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                cache: true
+                visible: status === Image.Ready
+              }
+              Rectangle {
+                visible: root.options.markFloating && app.modelData.floating
+                width: 8; height: 7; radius: 2
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.rightMargin: -2
+                anchors.bottomMargin: -2
+                color: root.bar ? root.bar.background : Color.background
+                border.width: 1
+                border.color: root.foreground
+              }
+              MouseArea {
+                id: appMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                cursorShape: Qt.PointingHandCursor
+                onClicked: function(mouse) {
+                  if (mouse.button === Qt.RightButton) { root.popupAnchor = pill; root.opened = true }
+                  else root.focusWindow(app.modelData.address, pill.modelData.id)
+                }
+                onWheel: function(wheel) { root.scroll(wheel.angleDelta.y) }
+              }
+              PanelToolTip {
+                visible: appMouse.containsMouse && !root.opened
+                text: app.modelData.name + (app.modelData.floating ? " · Floating" : "") + (app.modelData.pinned ? " · Pinned" : "") + (app.modelData.title && app.modelData.title !== app.modelData.name ? "\n" + app.modelData.title.substring(0, 180) : "")
+              }
             }
           }
-
-          MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onEntered: pill.hovered = true
-            onExited: pill.hovered = false
-            onClicked: if (pill.workspace) pill.workspace.activate()
+          Text {
+            visible: pill.overflow > 0
+            textFormat: Text.PlainText
+            text: "+" + pill.overflow
+            font.pixelSize: 11
+            font.family: Style.font.family
+            color: Util.alpha(root.foreground, 0.7)
+            Layout.alignment: Qt.AlignCenter
           }
         }
       }
     }
   }
+  SettingsPanel { widget: root }
 }

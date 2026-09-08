@@ -1,20 +1,16 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.thetrueferret.decent-workspaces",
-  "name": "Decent Workspaces",
-  "version": "1.0.0",
-  "author": "TheTrueFerret",
+  "id": "io.github.zucram.app-workspaces",
+  "name": "App Workspaces",
+  "version": "0.1.0",
+  "author": "zucram",
   "license": "MIT",
-  "description": "Per-monitor workspace indicators: shows only workspaces with windows, with an app icon beside each workspace number",
-  "kinds": [
-    "bar-widget"
-  ],
-  "entryPoints": {
-    "barWidget": "Workspaces.qml"
-  },
+  "description": "Workspace pills with real app icons, spatial window order, and a settings panel. Forked from Decent Workspaces by TheTrueFerret.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "Workspaces.qml"},
   "barWidget": {
-    "displayName": "Decent Workspaces",
-    "description": "Only the workspaces in use, on the monitor they belong to, with app icons",
+    "displayName": "App Workspaces",
+    "description": "Recognise the windows in each workspace at a glance",
     "category": "Compositor",
     "allowMultiple": false,
     "defaultSection": "left"

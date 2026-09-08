@@ -1,94 +1,159 @@
-AI Generated, didn't even look at the code, but does the job.
-I actually created this manually for waybar in the past... ain't doing that again ;)
+# App Workspaces
 
-# Decent Workspaces
+Real app icons for the Omarchy bar, ordered like your windows, with separate
+scratchpad pills and configurable floating-window markers.
 
-![Workspace 1 active with a browser icon, workspace 4 with browser, files and terminal icons](preview.png)
+**An MIT fork of [Decent Workspaces by TheTrueFerret](https://github.com/TheTrueFerret/omarchy-decent-workspaces).**
+See [NOTICE.md](NOTICE.md) for the starting commit and changes.
 
-A bar widget for Omarchy Quattro that shows workspaces the way you actually use
-them:
+![App Workspaces showing numbered workspaces and a scratchpad](preview.png)
 
-- **Only workspaces in use.** Empty workspaces are hidden. The workspace you are
-  currently on always stays visible even when empty, so the bar never goes blank
-  underneath you.
-- **Only this monitor's workspaces.** Each bar instance filters to the monitor it
-  lives on, and highlights *that monitor's* active workspace. The highlight is
-  softer on monitors that don't currently hold keyboard focus, so you can tell at
-  a glance where you are.
-- **App icons beside the number.** Every open window on a workspace contributes a
-  Nerd Font glyph next to the workspace number.
+## Use
 
-Click a workspace to focus it; scroll anywhere over the widget to step through
-workspaces.
+- Click a workspace number to switch to it. Scroll over the widget to cycle workspaces.
+- Click an app to focus its window. Scratchpad apps reveal their workspace first.
+- Click a scratchpad label to show or hide it. `S` means the default scratchpad;
+  other named scratchpads use their names.
+- Hover an app for its name and window title. A small outlined corner marker
+  identifies a floating window.
+- Right-click any workspace or app for settings. Changes save immediately.
+
+The default is one icon per window, ordered left to right and then top to
+bottom. Empty numbered workspaces are hidden unless active. Scratchpads stay
+reachable even when their last monitor differs from the bar's monitor.
+Floating and pinned windows appear in their reported workspace; pinned windows
+are not duplicated across workspace pills.
+
+## Requirements
+
+Omarchy 4 (Quattro), its Quickshell shell, and Hyprland with the Lua dispatcher
+API. Tested with Omarchy 4.0.2 and Hyprland 0.56.2. Older Waybar-based Omarchy
+versions are unsupported. The plugin uses installed desktop entries and icon
+themes. It needs no daemon, downloaded icon pack, or additional runtime package.
+Node.js is only needed for development tests.
 
 ## Install
 
-```bash
-omarchy plugin add https://github.com/TheTrueFerret/omarchy-decent-workspaces.git --enable
-omarchy bar put io.github.thetrueferret.decent-workspaces --section left --index 1
-```
-
-You probably want to drop the stock widget at the same time, since two workspace
-indicators side by side is rarely what you want:
+The GitHub URL below is reserved for the planned public repository. Until it
+is published, use the local checkout method.
 
 ```bash
-omarchy plugin disable omarchy.workspaces
+omarchy plugin add https://github.com/zucram/omarchy-app-workspaces.git --enable
+omarchy bar put io.github.zucram.app-workspaces --section left --index 1
 ```
+
+Choose which existing workspace widget to disable in Bar Studio. If replacing
+Decent Workspaces, disable it after checking the new widget:
+
+```bash
+omarchy plugin disable io.github.thetrueferret.decent-workspaces
+```
+
+For a local checkout, copy this repository's contents to
+`~/.config/omarchy/plugins/io.github.zucram.app-workspaces`, then run:
+
+```bash
+omarchy plugin validate ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
+omarchy restart shell
+omarchy plugin enable io.github.zucram.app-workspaces --section left --index 1
+```
+
+Restart the shell after updating QML files. A plugin rescan alone can retain
+cached components. Settings changes apply without a restart.
+
+The plugin does not install Hyprland bindings, change window rules, or replace
+another widget automatically. Placement and replacement use Omarchy controls.
 
 ## Settings
 
-Set these on the widget's entry in `~/.config/omarchy/shell.json`, or with
-`omarchy bar set io.github.thetrueferret.decent-workspaces <key> <value>`:
+Right-click the widget to open **Appearance** and **Windows**. Use Tab to move
+between controls, Left/Right on sliders, and Space or Enter on buttons and
+toggles. Escape closes the panel. Reset defaults resets both pages.
 
-| Key | Default | Meaning |
+[Appearance panel](docs/appearance.png) · [Window controls](docs/windows.png)
+
+| Setting | Default | Behavior |
 | --- | --- | --- |
-| `perMonitor` | `true` | Show only workspaces belonging to this bar's monitor. Set `false` to show all of them on every bar. |
-| `showEmpty` | `false` | Show workspaces with no windows. Set `true` for stock-like behaviour. |
-| `showIcons` | `true` | Draw an app icon per open window. |
-| `maxIcons` | `0` | Cap icons per workspace, collapsing the rest to `+N`. `0` means no cap. |
-| `maxWorkspaceId` | `10` | Highest workspace id to consider. |
+| App icons | On | Turn off for labels only. |
+| Workspace numbers | On | Keep numbers beside the app icons. Empty pills always retain a label. |
+| Icon size | 20 px | 12–28 px. |
+| Icon spacing | 6 px | 2–12 px. |
+| Icons per workspace | All | Limit the visible count and show `+N` for the rest. |
+| Group windows from the same app | Off | Show the leftmost window for each class; clicking focuses that representative. |
+| Show empty workspaces | Off | Include empty workspaces reported by Hyprland; never invent numbers 1–10. |
+| Only this monitor | On | Filter numbered workspaces to the bar's monitor. |
+| Show scratchpads | On | Separate pills for special workspaces. |
+| Keep empty scratchpads visible | Off | Retain the default scratchpad and named scratchpads encountered during this shell session. |
+| Include floating windows | On | Include floating windows in numbered and scratchpad pills. |
+| Mark floating windows | On | Draw a small corner outline on floating-window icons. |
 
-Example — cap icons at four and keep empty workspaces visible:
-
-```bash
-omarchy bar set io.github.thetrueferret.decent-workspaces maxIcons 4 --json
-omarchy bar set io.github.thetrueferret.decent-workspaces showEmpty true --json
-```
-
-## Adding an app icon
-
-Icons live in `IconRules.js` as an ordered list of `{ pattern, icon }`. The
-pattern is a case-insensitive regex tested against the window title first and
-the window class second, and the **first match wins** — so title-specific rules
-have to sit above generic class rules, or an Amazon tab in Firefox would render
-the Firefox icon.
-
-To find the class of a window you want to add:
+Settings live on the widget entry in `~/.config/omarchy/shell.json`.
+The equivalent keys are `showIcons`, `showNumbers`, `iconSize`, `iconGap`,
+`maxIcons` (`0` means all), `groupApps`, `showEmpty`, `perMonitor`,
+`showScratchpad`, `showEmptyScratchpad`, `showFloating`, and `markFloating`.
+For example:
 
 ```bash
-hyprctl clients -j | jq -r '.[] | "\(.class)\t\(.title)"'
+omarchy bar set io.github.zucram.app-workspaces iconSize 22 --json
 ```
 
-Then add a rule and save; the shell hot-reloads local plugins.
+### Missing or unexpected icons
 
-## Uninstall
+The resolver checks desktop IDs, startup classes, web-app URLs, launcher names,
+and the shell's lookup hints. Classless apps can match an exact launcher name
+through their window title. Unknown apps show an initial tile. A fallback tile
+can also mean the selected icon file is missing from the installed icon theme.
+
+For an unusual app, add an exact class-to-desktop-ID mapping:
 
 ```bash
-omarchy plugin remove io.github.thetrueferret.decent-workspaces
+omarchy bar set io.github.zucram.app-workspaces iconOverrides '{"Beeper":"beeper","title:LibrePods":"me.kavishdevar.librepods"}' --json
 ```
 
-## Development
+Keys are case-sensitive. `title:` keys match exact titles. Values name installed
+desktop entries, with an optional `.desktop` suffix. They are not commands or
+arbitrary paths. Overrides use the CLI; the settings panel covers presentation.
+Reset defaults preserves these mappings.
+
+### Diagnostics
 
 ```bash
-omarchy plugin validate ~/.config/omarchy/plugins/io.github.thetrueferret.decent-workspaces
-qmllint -I ~/.local/share/omarchy/shell Workspaces.qml
-qs log -i "$(qs list --all | awk '/^Instance/ {print substr($2, 1, length($2)-1); exit}')"
+omarchy-shell io.github.zucram.app-workspaces status
+omarchy-shell io.github.zucram.app-workspaces refresh
+omarchy-shell io.github.zucram.app-workspaces open
 ```
 
-## Credits
+`status` reports local window titles, icon sources, ordering, and settings.
+Review titles before sharing its output. Nothing is transmitted by the plugin.
+Window events trigger a refresh; a one-second compositor refresh also catches
+geometry changes that have no event. Unchanged snapshots keep their delegates.
+No shell polling process is spawned.
 
-The icon map is adapted from the `saif.workspaces` plugin by Saif Omar (MIT).
+## Remove
+
+```bash
+omarchy plugin remove io.github.zucram.app-workspaces
+```
+
+Re-enable your previous widget in Bar Studio, or for Decent Workspaces:
+
+```bash
+omarchy plugin enable io.github.thetrueferret.decent-workspaces --section left --index 1
+```
+
+## Develop
+
+```bash
+node --test tests/*.cjs
+omarchy plugin validate .
+```
+
+Model tests exercise matching, lifecycle misses, ordering, filters, malformed
+settings, and Lua-string escaping. QML behavior also needs a running desktop;
+see [validation evidence and limits](docs/validation.md). The initial release
+is a preview, not a claim of broad hardware coverage.
 
 ## License
 
-MIT
+MIT. Copyright TheTrueFerret and zucram. Application icons belong to their
+respective owners and are loaded from the user's system.
