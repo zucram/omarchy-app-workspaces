@@ -176,3 +176,28 @@ function luaString(value) {
         return "\\" + ("00" + c.charCodeAt(0)).slice(-3);
     }) + '"';
 }
+
+// A complete compositor response replaces the previous snapshot, including [].
+// Invalid responses return null so a failed query cannot blank the bar.
+function clientSnapshot(json) {
+    var clients;
+    try { clients = JSON.parse(json); } catch (error) { return null; }
+    if (!Array.isArray(clients)) return null;
+    var result = [];
+    var seen = Object.create(null);
+    for (var i = 0; i < clients.length; i++) {
+        var client = clients[i];
+        if (!client || !text(client.address) || !client.workspace
+            || typeof client.workspace.id !== "number") return null;
+        if (client.mapped === false) continue;
+        var address = text(client.address).replace(/^0x/, "");
+        if (!/^[0-9a-f]+$/i.test(address)) return null;
+        if (seen[address]) continue;
+        seen[address] = true;
+        result.push({address: address, class: text(client["class"] || client.initialClass),
+            title: text(client.title), at: client.at || [0, 0],
+            floating: client.floating === true, pinned: client.pinned === true,
+            workspaceId: client.workspace.id});
+    }
+    return result;
+}

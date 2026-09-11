@@ -16,6 +16,7 @@ BarWidget {
   readonly property var barWindow: root.QsWindow.window
   readonly property string screenName: barWindow && barWindow.screen ? barWindow.screen.name : ""
   property var windows: []
+  property var clientWindows: []
   property var workspaces: []
   property string modelSignature: ""
   property bool opened: false
@@ -38,23 +39,11 @@ BarWidget {
   function refresh() {
     Hyprland.refreshMonitors()
     Hyprland.refreshWorkspaces()
-    Hyprland.refreshToplevels()
+    if (!clients.running) clients.running = true
     settle.restart()
   }
   function readModel() {
-    var tops = Hyprland.toplevels.values
-    var nextWindows = []
-    for (var i = 0; i < tops.length; i++) {
-      var t = tops[i]
-      var ipc = t.lastIpcObject || ({})
-      var address = String(t.address || ipc.address || "")
-      if (!address) continue
-      nextWindows.push({address: address,
-        class: String(ipc["class"] || ipc.initialClass || ""),
-        title: String(t.title || ipc.title || ""),
-        at: ipc.at || [0, 0], floating: ipc.floating === true, pinned: ipc.pinned === true,
-        workspaceId: t.workspace ? t.workspace.id : (ipc.workspace ? ipc.workspace.id : 0)})
-    }
+    var nextWindows = root.clientWindows
     var nextWorkspaces = []
     var ws = Hyprland.workspaces.values
     for (var j = 0; j < ws.length; j++) {
@@ -93,8 +82,27 @@ BarWidget {
   }
   Timer { id: refreshDelay; interval: 60; onTriggered: root.refresh() }
   Timer { id: settle; interval: 80; onTriggered: root.readModel() }
-  // Geometry changes do not all have IPC events. Refresh without starting a
-  // shell process; unchanged snapshots do not rebuild the window delegates.
+  // Reconcile complete snapshots even if Quickshell misses a close event.
+  // Never merge with Hyprland.toplevels: that cache can retain closed clients.
+  Process {
+    id: clients
+    command: ["hyprctl", "-j", "clients"]
+    stdout: StdioCollector { id: clientOutput }
+    onExited: (exitCode, exitStatus) => {
+      if (exitCode !== 0 || exitStatus !== 0) return
+      var snapshot = Model.clientSnapshot(clientOutput.text)
+      if (snapshot === null) return
+      root.clientWindows = snapshot
+      root.readModel()
+    }
+  }
+  Timer {
+    interval: 2000
+    running: clients.running
+    onTriggered: clients.signal(9)
+  }
+  // Geometry changes do not all have IPC events. Unchanged snapshots retain
+  // their delegates. At most one client query runs at a time.
   Timer { interval: 1000; repeat: true; running: root.visible; onTriggered: root.refresh() }
 
   function iconSource(icon) {

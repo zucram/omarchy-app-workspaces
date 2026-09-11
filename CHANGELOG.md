@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Remove stale app icons after missed window-close events by reading complete
+  Hyprland client snapshots instead of the shell's cached toplevel list.
+
+
 ## 0.1.1 — package correction
 
 - Remove agent instruction files from the published source and runtime package.

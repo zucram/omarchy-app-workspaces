@@ -125,9 +125,12 @@ omarchy-shell io.github.zucram.app-workspaces open
 `status` reports local window titles, icon sources, ordering, settings, and
 whether the settings panel is open (`settingsOpen`).
 Review titles before sharing its output. Nothing is transmitted by the plugin.
-Window events trigger a refresh; a one-second compositor refresh also catches
-geometry changes that have no event. Unchanged snapshots keep their delegates.
-No shell polling process is spawned.
+Window events trigger a refresh. A one-second `hyprctl -j clients` query also
+catches missed close events and geometry changes. Each successful response
+replaces the window list, removing closed windows even if the shell cache still
+contains them. Failed queries preserve the last valid list. Queries never
+overlap, and a query is stopped after two seconds. Unchanged snapshots keep
+their delegates.
 
 ## Remove
 

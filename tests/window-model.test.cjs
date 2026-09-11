@@ -174,3 +174,33 @@ test('empty scratchpad preference preserves named destinations after last close'
     assert.ok(placeholders.every(w => w.placeholder && w.windows === 0));
     assert.equal(model.scratchpads([], [], {}).length, 0);
 });
+
+
+test('complete client snapshots remove a closed YouTube window after a missed event', () => {
+    const live = { address: '0x558832994e90', class: 'chrome-youtube.com__-Default',
+        title: 'Fable Vs Astra Debate Is Over - YouTube', workspace: { id: 1 },
+        at: [3847, 66], mapped: true };
+    const closed = { ...live, address: '0x55883360c0e0', title: 'Old YouTube window' };
+    let windows = model.clientSnapshot(JSON.stringify([live, closed]));
+    assert.equal(windows.length, 2);
+    windows = model.clientSnapshot(JSON.stringify([live]));
+    assert.deepEqual(plain(model.windowsForWorkspace(windows, 1, {})), [{
+        address: '558832994e90', class: live.class, title: live.title,
+        at: [3847, 66], floating: false, pinned: false, workspaceId: 1
+    }]);
+    assert.deepEqual(plain(model.clientSnapshot('[]')), []);
+});
+
+test('client snapshots reject failed or partial responses and exclude unmapped clients', () => {
+    for (const value of ['', '[', '{}', '[null]', '[{"address":"bad"}]'])
+        assert.equal(model.clientSnapshot(value), null);
+    const client = { address: '0xabc', workspace: { id: -98 },
+        class: 'helium', title: 'Browser', floating: true, pinned: true };
+    const windows = model.clientSnapshot(JSON.stringify([
+        client, client, { ...client, address: '0xdef', mapped: false }
+    ]));
+    assert.equal(windows.length, 1);
+    assert.equal(windows[0].workspaceId, -98);
+    assert.equal(windows[0].floating, true);
+    assert.equal(windows[0].pinned, true);
+});
