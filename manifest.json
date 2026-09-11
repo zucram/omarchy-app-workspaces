@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.zucram.app-workspaces",
   "name": "App Workspaces",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "zucram",
   "license": "MIT",
   "description": "Workspace pills with real app icons, spatial window order, and a settings panel. Forked from Decent Workspaces by TheTrueFerret.",

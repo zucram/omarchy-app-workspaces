@@ -177,7 +177,7 @@ BarWidget {
     if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, next)
   }
   function status() {
-    return JSON.stringify({version: "0.1.1", settingsOpen: root.opened, activeScratchpads: root.activeSpecialIds, options: root.options, screen: root.screenName, activeWorkspace: root.activeId,
+    return JSON.stringify({version: "0.1.2", settingsOpen: root.opened, activeScratchpads: root.activeSpecialIds, options: root.options, screen: root.screenName, activeWorkspace: root.activeId,
       workspaces: root.visibleWorkspaces.map(function(ws) { return {id: ws.id, name: ws.name, windows: root.presentWindows(ws.id)} })})
   }
   IpcHandler {

@@ -51,7 +51,7 @@ For a local checkout, build and extract the runtime archive, then enable it:
 ```bash
 node scripts/package-release.cjs
 mkdir -p ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
-tar -xzf app-workspaces-0.1.1.tar.gz -C ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
+tar -xzf app-workspaces-0.1.2.tar.gz -C ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
 omarchy plugin validate ~/.config/omarchy/plugins/io.github.zucram.app-workspaces
 omarchy restart shell
 omarchy plugin enable io.github.zucram.app-workspaces --section left --index 1
